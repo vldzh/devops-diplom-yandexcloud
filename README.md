@@ -26,11 +26,38 @@
 
 1. Создайте сервисный аккаунт, который будет в дальнейшем использоваться Terraform для работы с инфраструктурой с необходимыми и достаточными правами. Не стоит использовать права суперпользователя
 
+создадим  основную директорию для инфраструктуры:
+```
 mkdir -p terraform-infrastructure
+```
+создадим отдельную директорию для backend конфигурации:
+```
 mkdir -p terraform-infrastructure/backend
+```
+
 Создадим файл variables.tf с необходимыми переменными:
+```
+variable "yc_token" {
+  description = "Yandex Cloud OAuth token"
+  type        = string
+}
 
+variable "yc_cloud_id" {
+  description = "Yandex Cloud ID"
+  type        = string
+}
 
+variable "yc_folder_id" {
+  description = "Yandex Cloud Folder ID"
+  type        = string
+}
+
+variable "sa_name" {
+  description = "Service account name"
+  type        = string
+  default     = "terraform-sa"
+}
+```
 
 
 
