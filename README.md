@@ -17,55 +17,337 @@
 
 Для начала необходимо подготовить облачную инфраструктуру в ЯО при помощи [Terraform](https://www.terraform.io/).
 
-Особенности выполнения:
+Установим Yandex cloud CLI
+```
+vlad@DESKTOP-2V70QV1:~/netology$ curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+Downloading yc 0.185.0
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  158M  100  158M    0     0  15.0M      0  0:00:10  0:00:10 --:--:-- 16.5M
+Yandex Cloud CLI 0.185.0 linux/amd64
 
-- Бюджет купона ограничен, что следует иметь в виду при проектировании инфраструктуры и использовании ресурсов;
-Для облачного k8s используйте региональный мастер(неотказоустойчивый). Для self-hosted k8s минимизируйте ресурсы ВМ и долю ЦПУ. В обоих вариантах используйте прерываемые ВМ для worker nodes.
+yc PATH has been added to your '/home/vlad/.bashrc' profile
+yc bash completion has been added to your '/home/vlad/.bashrc' profile.
+Now we have zsh completion. Type "echo 'source /home/vlad/yandex-cloud/completion.zsh.inc' >>  ~/.zshrc" to install itTo complete installation, start a new shell (exec -l $SHELL) or type 'source "/home/vlad/.bashrc"' in the current one
+vlad@DESKTOP-2V70QV1:~/netology$ source "/home/vlad/.bashrc"
+```
+Инициализируем Yandex cloud CLI:
+```
+vlad@DESKTOP-2V70QV1:~/netology$ yc init
+Welcome! This command will take you through the configuration process.
+...
+...
+Please enter your numeric choice: 1
+Your profile default Compute zone has been set to 'ru-central1-a'.
+vlad@DESKTOP-2V70QV1:~/netology$ yc iam service-account create --name terraform-sa
+
+done (2s)
+id: axxxxxxxxxxxxxxx2
+folder_id: bxxxxxxxxxxxxxxxxx2
+created_at: "2025-12-28T10:57:26Z"
+name: terraform-sa
+```
 
 Предварительная подготовка к установке и запуску Kubernetes кластера.
 
-1. Создайте сервисный аккаунт, который будет в дальнейшем использоваться Terraform для работы с инфраструктурой с необходимыми и достаточными правами. Не стоит использовать права суперпользователя
-
-создадим  основную директорию для инфраструктуры:
-```
-mkdir -p terraform-infrastructure
-```
-создадим отдельную директорию для backend конфигурации:
-```
-mkdir -p terraform-infrastructure/backend
+1. Создадим сервисный аккаунт, который будет в дальнейшем использоваться Terraform для работы с инфраструктурой с необходимыми и достаточными правами. Не стоит использовать права суперпользователя
 ```
 
-Создадим файл variables.tf с необходимыми переменными:
+vlad@DESKTOP-2V70QV1:~/netology$ SA_ID=$(yc iam service-account get terraform-sa --format json | jq -r .id)
+
+# Назначение ролей
+vlad@DESKTOP-2V70QV1:~/netology$ yc resource-manager folder add-access-binding bxxxxxxxxxxxxx2 \
+>   --role editor \
+>   --subject serviceAccount:$SA_ID
+done (21s)
+effective_deltas:
+  - action: ADD
+    access_binding:
+      role_id: editor
+      subject:
+        id: axxxxxxxxxxxxxxxx2
+        type: serviceAccount
+
+# Создание ключа
+vlad@DESKTOP-2V70QV1:~/netology$ yc iam key create --service-account-id $SA_ID --output key.json
+id: axxxxxxxxxxxxxxxe
+service_account_id: axxxxxxxxxxxxxxx2
+created_at: "2025-12-28T11:09:33.633843998Z"
+key_algorithm: RSA_2048
+
 ```
-variable "yc_token" {
-  description = "Yandex Cloud OAuth token"
-  type        = string
+
+создадим  директорию для terraform инфраструктуры, проверим  глобальную конфигурации Terraform
+```
+vlad@DESKTOP-2V70QV1:~/netology/devops-diplom-yandexcloud$ mkdir -p terraform/{backend,main,modules}
+vlad@DESKTOP-2V70QV1:~/netology/devops-diplom-yandexcloud$ tree -L 2
+.
+├── README.md
+└── terraform
+    ├── backend
+    ├── main
+    └── modules
+
+5 directories, 1 file
+vlad@DESKTOP-2V70QV1:~/netology/devops-diplom-yandexcloud$ cat ~/.terraform.d/terraform.rc
+provider_installation {
+  network_mirror {
+    url = "https://terraform-mirror.yandexcloud.net/"
+    include = ["registry.terraform.io/*/*"]
+  }
+  direct {
+    exclude = ["registry.terraform.io/*/*"]
+  }
 }
+```
+Установим и проверим переменные окуружения
+```
+vlad@DESKTOP-2V70QV1:~/netology/devops-diplom-yandexcloud$ export TF_VAR_cloud_id=$(yc config get cloud-id)
+export TF_VAR_folder_id=$(yc config get folder-id)
+export TF_VAR_yc_token=$(yc iam create-token)
+export TF_VAR_sa_id=$SA_ID
 
-variable "yc_cloud_id" {
-  description = "Yandex Cloud ID"
-  type        = string
-}
+vlad@DESKTOP-2V70QV1:~/netology/devops-diplom-yandexcloud$ echo "TF_VAR_cloud_id:  $TF_VAR_cloud_id"
+echo "TF_VAR_folder_id: $TF_VAR_folder_id"
+echo "TF_VAR_sa_id:     $TF_VAR_sa_id"
+echo "TF_VAR_yc_token:  $TF_VAR_yc_token"
+TF_VAR_cloud_id:  b1gn................
+TF_VAR_folder_id: b1g2................
+TF_VAR_sa_id:     ajef................
+TF_VAR_yc_token:  t1.9..........................................................
+```
 
-variable "yc_folder_id" {
+
+Создаем корневую директорию проекта
+```
+mkdir -p ~/devops-diplom-yandexcloud
+cd ~/devops-diplom-yandexcloud
+```
+Создаем структуру для backend
+```
+mkdir -p terraform/backend
+cd terraform/backend
+```
+Создаем файл variables.tf для backend
+```
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ cat variables.tf 
+variable "folder_id" {
   description = "Yandex Cloud Folder ID"
   type        = string
+  sensitive   = false
+}
+
+variable "sa_id" {
+  description = "Service Account ID"
+  type        = string
+  sensitive   = false
+}
+
+variable "yc_token" {
+  description = "IAM Token for Yandex Cloud"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloud_id" {
+  description = "Yandex Cloud ID"
+  type        = string
+  sensitive   = false
+}
+
+variable "default_zone" {
+  type    = string
+  default = "ru-central1-a"
 }
 
 variable "sa_name" {
-  description = "Service account name"
-  type        = string
-  default     = "terraform-sa"
+  type    = string
+  default = "terraform-sa"
+}
+
+variable "bucket_name" {
+  type    = string
+  default = "netology-diploma-vladyezh-tfstate"
+}
+```
+Создаем файл providers.tf для backend
+```
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ cat providers.tf 
+terraform {
+  required_providers {
+    yandex = {
+      source = "yandex-cloud/yandex"
+    }
+  }
+  required_version = ">= 0.13"
+}
+
+provider "yandex" {
+  token     = var.yc_token
+  cloud_id  = var.cloud_id
+  folder_id = var.folder_id
+  zone      = var.default_zone
 }
 ```
 
 
+2. Подготовим  backend для Terraform - S3 bucket в созданном ЯО аккаунте(создание бакета через TF)
+```
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ cat main.tf 
+# Создание бакета для Terraform state
+resource "yandex_storage_bucket" "terraform_state" {
+  bucket    = var.bucket_name
+  folder_id = var.folder_id
+  acl       = "private"
 
+  versioning {
+    enabled = true
+  }
 
-2. Подготовьте [backend](https://developer.hashicorp.com/terraform/language/backend) для Terraform:  
-   а. Рекомендуемый вариант: S3 bucket в созданном ЯО аккаунте(создание бакета через TF)
-   б. Альтернативный вариант:  [Terraform Cloud](https://app.terraform.io/)
-3. Создайте конфигурацию Terrafrom, используя созданный бакет ранее как бекенд для хранения стейт файла. Конфигурации Terraform для создания сервисного аккаунта и бакета и основной инфраструктуры следует сохранить в разных папках.
+}
+
+output "bucket_id" {
+  value = yandex_storage_bucket.terraform_state.id
+}
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ cat providers.tf 
+terraform {
+  required_providers {
+    yandex = {
+      source = "yandex-cloud/yandex"
+    }
+  }
+  required_version = ">= 0.13"
+}
+
+provider "yandex" {
+  token     = var.yc_token
+  cloud_id  = var.cloud_id
+  folder_id = var.folder_id
+  zone      = var.default_zone
+}
+```
+
+3. Создадим конфигурацию Terrafrom, используя созданный бакет ранее как бекенд для хранения стейт файла. Конфигурации Terraform для создания сервисного аккаунта и бакета и основной инфраструктуры следует сохранить в разных папках.
+```
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ terraform   plan
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # yandex_storage_bucket.terraform_state will be created
+  + resource "yandex_storage_bucket" "terraform_state" {
+      + acl                   = "private"
+      + bucket                = "netology-diploma-vladyezh-tfstate"
+      + bucket_domain_name    = (known after apply)
+      + default_storage_class = (known after apply)
+      + folder_id             = "b...............s2"
+      + force_destroy         = false
+      + id                    = (known after apply)
+      + policy                = (known after apply)
+      + website_domain        = (known after apply)
+      + website_endpoint      = (known after apply)
+
+      + anonymous_access_flags (known after apply)
+
+      + grant (known after apply)
+
+      + versioning {
+          + enabled = true
+        }
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + bucket_id   = (known after apply)
+  - bucket_name = "netology-diploma-tfstate-$(substr(md5(var.folder_id), 0, 8))" -> null
+╷
+│ Warning: Argument is deprecated
+│ 
+│   with yandex_storage_bucket.terraform_state,
+│   on main.tf line 5, in resource "yandex_storage_bucket" "terraform_state":
+│    5:   acl       = "private"
+│ 
+│ Use `yandex_storage_bucket_grant` instead.
+╵
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't guarantee to take exactly these actions if you run "terraform apply" now.
+vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/backend$ terraform apply
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # yandex_storage_bucket.terraform_state will be created
+  + resource "yandex_storage_bucket" "terraform_state" {
+      + acl                   = "private"
+      + bucket                = "netology-diploma-vladyezh-tfstate"
+      + bucket_domain_name    = (known after apply)
+      + default_storage_class = (known after apply)
+      + folder_id             = "b..............2"
+      + force_destroy         = false
+      + id                    = (known after apply)
+      + policy                = (known after apply)
+      + website_domain        = (known after apply)
+      + website_endpoint      = (known after apply)
+
+      + anonymous_access_flags (known after apply)
+
+      + grant (known after apply)
+
+      + versioning {
+          + enabled = true
+        }
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + bucket_id   = (known after apply)
+  - bucket_name = "netology-diploma-tfstate-$(substr(md5(var.folder_id), 0, 8))" -> null
+╷
+│ Warning: Argument is deprecated
+│ 
+│   with yandex_storage_bucket.terraform_state,
+│   on main.tf line 5, in resource "yandex_storage_bucket" "terraform_state":
+│    5:   acl       = "private"
+│ 
+│ Use `yandex_storage_bucket_grant` instead.
+│ 
+│ (and one more similar warning elsewhere)
+╵
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+yandex_storage_bucket.terraform_state: Creating...
+yandex_storage_bucket.terraform_state: Still creating... [00m10s elapsed]
+yandex_storage_bucket.terraform_state: Creation complete after 14s [id=netology-diploma-vladyezh-tfstate]
+╷
+│ Warning: Argument is deprecated
+│ 
+│   with yandex_storage_bucket.terraform_state,
+│   on main.tf line 5, in resource "yandex_storage_bucket" "terraform_state":
+│    5:   acl       = "private"
+│ 
+│ Use `yandex_storage_bucket_grant` instead.
+╵
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+bucket_id = "netology-diploma-vladyezh-tfstate"
+```
+
 4. Создайте VPC с подсетями в разных зонах доступности.
 5. Убедитесь, что теперь вы можете выполнить команды `terraform destroy` и `terraform apply` без дополнительных ручных действий.
 6. В случае использования [Terraform Cloud](https://app.terraform.io/) в качестве [backend](https://developer.hashicorp.com/terraform/language/backend) убедитесь, что применение изменений успешно проходит, используя web-интерфейс Terraform cloud.
