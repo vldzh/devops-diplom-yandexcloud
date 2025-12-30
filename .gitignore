@@ -31,6 +31,7 @@ key.json
 .env
 secrets/
 *.secret
+*.hcl
 
 # Logs
 *.log
