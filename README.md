@@ -2109,13 +2109,13 @@ https://github.com/vldzh/devops-diplom-yandexcloud
 3. Репозиторий с конфигурацией ansible, если был выбран способ создания Kubernetes кластера при помощи ansible.
 4. Репозиторий с Dockerfile тестового приложения и ссылка на собранный docker image.
 https://github.com/vldzh/test-nginx-app
-https://cr.yandex/v2/crp12lptvmh9j0d4te0j/test-nginx-app/tags/list"
+https://cr.yandex/v2/crp12lptvmh9j0d4te0j/test-nginx-app/tags/list
 ![15.png](images/15.png)
 5. Репозиторий с конфигурацией Kubernetes кластера.
 https://github.com/vldzh/devops-diplom-yandexcloud/tree/main/terraform/main
 6. Ссылка на тестовое приложение и веб интерфейс Grafana с данными доступа.
 http://158.160.136.102/index.html  - тестовое приложение 
-http://158.160.177.176/login  - веб интерфейс Grafana 
+http://158.160.147.64/login  - веб интерфейс Grafana 
 7. Все репозитории рекомендуется хранить на одном ресурсе github
 
 
