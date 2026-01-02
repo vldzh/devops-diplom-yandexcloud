@@ -60,13 +60,14 @@ resource "yandex_kubernetes_node_group" "k8s_node_group" {
     }
 
     resources {
-      memory = 4
-      cores  = 2
+      memory        = 2
+      cores         = 2
+      core_fraction = 10
     }
 
     boot_disk {
       type = "network-hdd"
-      size = 64
+      size = 32
     }
 
     scheduling_policy {
