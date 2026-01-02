@@ -1541,9 +1541,12 @@ kube-system   yc-disk-csi-node-v2-9grng              6/6     Running   0        
 kube-system   yc-disk-csi-node-v2-9vmsf              6/6     Running   0          36m
 kube-system   yc-disk-csi-node-v2-qvrcf              6/6     Running   0          36m
 ```
+![02.png](images/02.png)
+![03.png](images/03.png)
+
 ---
 ### Создание тестового приложения
-Для перехода к следующему этапу необходимо подготовить тестовое приложение, эмулирующее основное приложение разрабатываемое вашей компанией.
+Для перехода к следующему этапу необходимо подготовить тестовое приложение, эмулирующее основное приложение разрабатываемое компанией.
 Способ подготовки:
 1. Рекомендуемый вариант:  
    а. Создадим отдельный git репозиторий с простым nginx конфигом, который будет отдавать статические данные.   
@@ -1797,9 +1800,8 @@ vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ kubectl get service -n monitorin
 vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ kubectl --namespace monitoring get secrets prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
 I0......................
 ```
-
-
-
+![04.png](images/04.png)
+![05.png](images/05.png)
 
 2. Задеплоим тестовое приложение nginx, сервер отдающий статическую страницу.
 ```
@@ -1880,6 +1882,7 @@ vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ curl http://158.160.136.102
 <!DOCTYPE html><html><head><title>TEST NGINX APP</title></head><body><h1>HAPPY NEW YEAR!</h1></body></html>
 ```
 
+![06.png](images/06.png)
 
 ### Деплой инфраструктуры в terraform pipeline
 
@@ -1970,28 +1973,150 @@ yc container registry list
 # 5. YC_SERVICE_ACCOUNT_KEY (создание)
 # Создать ключ и закодировать в base64
 yc iam key create --service-account-name github-actions-sa -o json | base64 -w 0
-
+```
 Перейдем в: GitHub → Settings → Secrets and variables → Actions → New repository secret
+Создадим скреты
+![07.png](images/07.png)
+Создаим .github/workflows/cicd.yaml
+Ghb k.ljv rjvvbnt
+```
+name: CI/CD — Build & Deploy to Yandex Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: test-nginx-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      YC_CLOUD_ID:       ${{ secrets.YC_CLOUD_ID }}
+      YC_FOLDER_ID:      ${{ secrets.YC_FOLDER_ID }}
+      YC_K8S_CLUSTER_ID: ${{ secrets.YC_K8S_CLUSTER_ID }}
+      YC_REGISTRY_ID:    ${{ secrets.YC_REGISTRY_ID }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install yc CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Restore SA key from secret
+        run: |
+          echo "$YC_SERVICE_ACCOUNT_KEY" | base64 -d > sa-key.json
+        env:
+          YC_SERVICE_ACCOUNT_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY }}
+
+      - name: Authenticate yc CLI with service account key
+        run: |
+          yc config set cloud-id $YC_CLOUD_ID
+          yc config set folder-id $YC_FOLDER_ID
+          yc config set service-account-key sa-key.json
+
+      - name: Configure Docker for Yandex Container Registry
+        run: yc container registry configure-docker
+
+      - name: Build and push Docker image (commit hash + latest)
+        run: |
+          COMMIT_SHORT=${GITHUB_SHA::8}
+          REGISTRY=cr.yandex/$YC_REGISTRY_ID
+          IMAGE_COMMIT=$REGISTRY/$IMAGE_NAME:$COMMIT_SHORT
+          IMAGE_LATEST=$REGISTRY/$IMAGE_NAME:latest
+
+          docker build -t "$IMAGE_COMMIT" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE_COMMIT"
+          docker push "$IMAGE_LATEST"
+
+      - name: Get kubeconfig for Yandex Kubernetes
+        run: yc managed-kubernetes cluster get-credentials $YC_K8S_CLUSTER_ID --external
+
+      - name: Restart deployment to pull new :latest image
+        run: kubectl rollout restart deployment/test-nginx-app
+```
+
+Пошаговое описание процесса
+Шаг 1: Триггеры запуска
+Автоматический запуск (push): Пайплайн запускается автоматически каждый раз, когда разработчик заливает изменения (git push) в ветку main.
+Ручной запуск (workflow_dispatch): Пайплайн можно запустить вручную через интерфейс GitHub Actions (кнопка "Run workflow").
+
+Шаг 2: Подготовка среды
+Создается новая, чистая виртуальная машина с операционной системой Ubuntu.
+На ней инициализируется рабочий процесс (job) с именем build-and-deploy.
+В переменные окружения загружаются важные идентификаторы от Yandex Cloud, которые хранятся в секретах репозитория GitHub (никто посторонний их не видит).
+
+Шаг 3: Получение кода (Checkout code)
+На виртуальную машину копируется (клонируется) последняя версия кода проекта из репозитория GitHub.
+
+Шаг 4: Настройка Docker (Set up Docker Buildx)
+Устанавливается и настраивается современный инструмент для сборки Docker-образов (Buildx), который ускоряет процесс.
+
+Шаг 5: Установка инструмента Yandex Cloud CLI (Install yc CLI)dfi
+
+Шаг 6: Работа с ключом доступа (Restore SA key... / Authenticate yc CLI...)
+Из секрета GitHub извлекается и расшифровывается ключ сервисного аккаунта Yandex Cloud (специального пользователя с правами на управление инфраструктурой).
+Этот ключ сохраняется в файл sa-key.json на виртуальной машине.
+Инструмент yc настраивается на использование этого ключа и указанных ранее идентификаторов облака и каталога. Теперь система может от имени  проекта выполнять действия в Yandex Cloud.
+
+Шаг 7: Настройка доступа к реестру контейнеров (Configure Docker...)
+Локальный Docker настраивается для работы с приватным Yandex Container Registry (CR). После этого команды docker push/pull будут работать с  реестром в Yandex Cloud.
+
+Шаг 8: Сборка и публикация Docker-образа (Build and push Docker image)
+Создается Docker-образ приложения на основе Dockerfile
+Образу присваиваются две метки (теги):
+Уникальный тег по хэшу коммита (например, test-nginx-app:a1b2c3d4). Позволяет точно идентифицировать образ, собранный из конкретной версии кода.
+Тег latest (например, test-nginx-app:latest). "Плавающий" тег, указывающий на самую свежую сборку.
+Оба образа загружаются (push) в приватный Container Registry в Yandex Cloud.
+
+Шаг 9: Подключение к Kubernetes (Get kubeconfig...)
+Система получает доступ к кластеру Yandex Managed Kubernetes.
+Команда yc скачивает конфигурационный файл (kubeconfig), после чего утилита kubectl (автоматически доступная в среде) может управлять кластером.
+
+Шаг 10: Обновление приложения в кластере (Restart deployment...)
+Выполняется ключевая команда обновления: kubectl rollout restart deployment/test-nginx-app.
+Что это делает:
+Kubernetes получает указание перезапустить все Pod'ы (контейнеры) в развертывании (deployment) с именем test-nginx-app.
+При создании новых Pod'ов Kubernetes замечает, что у образа в реестре изменился тег latest, и скачивает его новую версию.
+Происходит плавное (rolling update) обновление: старые Pod'ы останавливаются только после успешного запуска новых, что гарантирует отсутствие простоя приложения.
+
+Итог:
+Через несколько минут после git push  обновленное приложение автоматически, безопасно и без простоя начинает работать в продакшн-среде Yandex Cloud Kubernetes.
 
 
-
-
-
-
-Ожидаемый результат:
-
-1. Интерфейс ci/cd сервиса доступен по http.
-2. При любом коммите в репозиторие с тестовым приложением происходит сборка и отправка в регистр Docker образа.
-3. При создании тега (например, v1.0.0) происходит сборка и отправка с соответствующим label в регистри, а также деплой соответствующего Docker образа в кластер Kubernetes.
 
 ---
 ## Что необходимо для сдачи задания?
 
 1. Репозиторий с конфигурационными файлами Terraform и готовность продемонстрировать создание всех ресурсов с нуля.
+https://github.com/vldzh/devops-diplom-yandexcloud
 2. Пример pull request или снимки экрана из Terraform Cloud или вашего CI-CD-terraform pipeline.
+![09.png](images/09.png)
+![10.png](images/10.png)
+![11.png](images/11.png)
+![12.png](images/12.png)
+![13.png](images/13.png)
+![14.png](images/14.png)
 3. Репозиторий с конфигурацией ansible, если был выбран способ создания Kubernetes кластера при помощи ansible.
 4. Репозиторий с Dockerfile тестового приложения и ссылка на собранный docker image.
+https://github.com/vldzh/test-nginx-app
+https://cr.yandex/v2/crp12lptvmh9j0d4te0j/test-nginx-app/tags/list"
+![15.png](images/15.png)
 5. Репозиторий с конфигурацией Kubernetes кластера.
+https://github.com/vldzh/devops-diplom-yandexcloud/tree/main/terraform/main
 6. Ссылка на тестовое приложение и веб интерфейс Grafana с данными доступа.
+http://158.160.136.102/index.html  - тестовое приложение 
+http://158.160.177.176/login  - веб интерфейс Grafana 
 7. Все репозитории рекомендуется хранить на одном ресурсе github
+
+
 
