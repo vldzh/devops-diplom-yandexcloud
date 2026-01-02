@@ -353,7 +353,7 @@ bucket_id = "netology-diploma-vladyezh-tfstate"
 vlad@DESKTOP-2V70QV1:~/devops-diplom-yandexcloud/terraform/main$ yc iam access-key create --service-account-name terraform-sa
 access_key:
   id: ajea0k1jp13oiorgpc10
-  service_account_id: ajeft1of4dkmg0dctm82
+  service_account_id: aj..............
   created_at: "2025-12-29T23:14:46.236576138Z"
   key_id: YCA...................
   secret: YCP......................
@@ -1295,7 +1295,7 @@ Terraform will perform the following actions:
       + labels                   = (known after apply)
       + log_group_id             = (known after apply)
       + name                     = "diploma-k8s-cluster"
-      + network_id               = "enp6u38gjosccsu8os5i"
+      + network_id               = "у..................."
       + node_ipv4_cidr_mask_size = 24
       + node_service_account_id  = "aj.................."
       + release_channel          = (known after apply)
@@ -1468,9 +1468,9 @@ Outputs:
 
 debug_vars = <sensitive>
 k8s_cluster_external_v4_endpoint = "https://158.160.183.7"
-k8s_cluster_id = "catsg42gi7mpnnj0cuqc"
+k8s_cluster_id = "cats.............."
 k8s_cluster_name = "diploma-k8s-cluster"
-network_id = "enp6u38gjosccsu8os5i"
+network_id = "enp.................."
 network_name = "k8s-network"
 subnet_a_id = "e9bgttt1d727pctek04v"
 subnet_b_id = "e2lo8tpvp7m0no6vgv8b"
@@ -1610,7 +1610,7 @@ Terraform will perform the following actions:
   # yandex_container_registry.diploma_registry will be created
   + resource "yandex_container_registry" "diploma_registry" {
       + created_at  = (known after apply)
-      + folder_id   = "b1g2ll8gqs3068utaas2"
+      + folder_id   = "b1.................."
       + id          = (known after apply)
       + labels      = (known after apply)
       + name        = "diploma-registry"
@@ -1637,9 +1637,9 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 Outputs:
 
 k8s_cluster_external_v4_endpoint = "https://158.160.183.7"
-k8s_cluster_id = "catsg42gi7mpnnj0cuqc"
+k8s_cluster_id = "cats................."
 k8s_cluster_name = "diploma-k8s-cluster"
-network_id = "enp6u38gjosccsu8os5i"
+network_id = "enp.................."
 network_name = "k8s-network"
 registry_id = "cr.................."
 subnet_a_id = "e9bgttt1d727pctek04v"
@@ -1673,7 +1673,7 @@ vlad@DESKTOP-2V70QV1:~/netology/test-nginx-ayc container registry listlist
 +----------------------+------------------+----------------------+
 |          ID          |       NAME       |      FOLDER ID       |
 +----------------------+------------------+----------------------+
-| cr.................. | diploma-registry | b1g2ll8gqs3068utaas2 |
+| cr.................. | diploma-registry | b1.................. |
 +----------------------+------------------+----------------------+
 vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ export REGISTRY_ID=cr................
 ```
@@ -1930,7 +1930,7 @@ effective_deltas:
     access_binding:
       role_id: container-registry.admin
       subject:
-        id: aje86trkef7p426kcmk5
+        id: aj.................
         type: serviceAccount
 
 vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ yc resource-manager folder add-access-binding $FOLDER_ID \
@@ -1942,14 +1942,14 @@ effective_deltas:
     access_binding:
       role_id: k8s.cluster-api.cluster-admin
       subject:
-        id: aje86trkef7p426kcmk5
+        id: a.....................
         type: serviceAccount
 ```
 Генерируем JSON ключ 
 ```
 vlad@DESKTOP-2V70QV1:~/netology/test-nginx-app$ yc iam key create --service-account-name github-actions-sa --output key.json
-id: ajebfogb7b2092kgufhn
-service_account_id: aje86trkef7p426kcmk5
+id: aj...............
+service_account_id: aj..................
 created_at: "2025-12-31T23:43:25.882471212Z"
 key_algorithm: RSA_2048
 
