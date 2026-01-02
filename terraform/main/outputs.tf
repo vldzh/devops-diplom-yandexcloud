@@ -49,3 +49,15 @@ output "subnet_ids" {
     d = yandex_vpc_subnet.k8s_subnet_d.id
   }
 }
+
+output "k8s_cluster_id" {
+  value = yandex_kubernetes_cluster.k8s_cluster.id
+}
+
+output "k8s_cluster_name" {
+  value = yandex_kubernetes_cluster.k8s_cluster.name
+}
+
+output "k8s_cluster_external_v4_endpoint" {
+  value = yandex_kubernetes_cluster.k8s_cluster.master[0].external_v4_endpoint
+}
