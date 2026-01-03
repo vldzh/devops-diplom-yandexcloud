@@ -2114,7 +2114,7 @@ https://cr.yandex/v2/crp12lptvmh9j0d4te0j/test-nginx-app/tags/list
 5. Репозиторий с конфигурацией Kubernetes кластера.
 https://github.com/vldzh/devops-diplom-yandexcloud/tree/main/terraform/main
 6. Ссылка на тестовое приложение и веб интерфейс Grafana с данными доступа.
-http://158.160.136.102/index.html  - тестовое приложение 
+http://158.160.203.133/index.html  - тестовое приложение 
 http://158.160.147.64/login  - веб интерфейс Grafana 
 7. Все репозитории рекомендуется хранить на одном ресурсе github
 
