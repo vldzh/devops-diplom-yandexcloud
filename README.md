@@ -2115,7 +2115,7 @@ https://cr.yandex/v2/crp12lptvmh9j0d4te0j/test-nginx-app/tags/list
 https://github.com/vldzh/devops-diplom-yandexcloud/tree/main/terraform/main
 6. Ссылка на тестовое приложение и веб интерфейс Grafana с данными доступа.
 http://158.160.171.29/index.html  - тестовое приложение 
-http://158.160.147.64/login  - веб интерфейс Grafana 
+http://158.160.203.133/login  - веб интерфейс Grafana 
 7. Все репозитории рекомендуется хранить на одном ресурсе github
 
 
