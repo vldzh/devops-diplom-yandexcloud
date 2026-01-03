@@ -60,9 +60,9 @@ resource "yandex_kubernetes_node_group" "k8s_node_group" {
     }
 
     resources {
-      memory        = 2
+      memory        = 4
       cores         = 2
-      core_fraction = 10
+      core_fraction = 20
     }
 
     boot_disk {
